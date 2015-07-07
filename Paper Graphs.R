@@ -191,9 +191,14 @@ ed4 <- ed3 %>%
   group_by(sub) %>%
   mutate(mr = mean(r, na.rm = TRUE))  # Mean IA Run Count-Trial Total Visited IA Count
 
-ed4r <- ed3 %>%
+ed3r <- edr %>%
+  ungroup() %>%
+  group_by(sub, tnum) %>%
+  mutate(r = sum(IA_RUN_COUNT)-TRIAL_TOTAL_VISITED_IA_COUNT)  # IA Run Count-Trial Total Visited IA Count
+
+ed4r <- ed3r %>%
   group_by(sub, rtype) %>%
-  mutate(mrr = mean(r, na.rm = TRUE))  # Mean IA Run Count-Trial Total Visited IA Count for correct rejection, false alarm, hit, and miss
+  mutate(mrr = mean(r, na.rm = TRUE))  # Mean IA Run Count-Trial Total Visited IA Count
 
   # Graph: mean saccade count/rt versus mtut
   ct3a <- ed %>%
@@ -484,18 +489,59 @@ cor(select(lm, mr, mscrt, mafdrt, mtut))
 sr <- lm(tc ~ rc + sc, lm)
 summary(sr)
 
-lmr <- ed4 %>%
+lmr <- ed4r %>%
   ungroup() %>%
-  filter(r< 25, scrt > 0) %>%
-  select(sub, mscrt, mafdrt, mtut, mr, rtype) %>%
+  filter(r< 25, scrtr > 0) %>%
+  select(sub, mscrtr, mfrtr, mtut, mrr, rtype) %>%
   unique() %>%
   mutate(tc = (mtut - mean(mtut))/sd(mtut),
-         sc = (mscrt - mean(mscrt))/sd(mscrt),
-         fc = (mafdrt - mean(mafdrt, na.rm = TRUE))/sd(mafdrt, na.rm = TRUE),
-         rc = (mr - mean(mr))/sd(mr))
+         sc = (mscrtr - mean(mscrtr))/sd(mscrtr),
+         fc = (mfrtr - mean(mfrtr, na.rm = TRUE))/sd(mfrtr, na.rm = TRUE),
+         rc = (mrr - mean(mrr))/sd(mrr))
 
 srr <- lm(tc ~ rc*rtype + sc*rtype, lmr)
 summary(srr)
+
+ggplot(lm, aes(tc, sc))+
+  geom_point(colour = 'dimgrey',
+             size   = 2)+
+  geom_smooth(colour = "black",
+              method  = "lm",
+              se      = FALSE)+
+  labs(list(x = "Mean TUT Score",
+            y = "Mean Saccade Count\nper Unit Time"))+
+  theme(axis.title.x      = element_text(vjust = -0.2),
+        axis.title.y      = element_text(vjust = 1.2),
+        legend.text       = element_text(face   = "bold",
+                                         family = "Times New Roman",
+                                         size   = 22),
+        panel.background  = element_rect(fill = "white"),
+        panel.grid.major  = element_line(colour = "white"),
+        panel.grid.minor  = element_line(colour = "white"),
+        text              = element_text(face   = "bold",
+                                         family = "Times New Roman",
+                                         size   = 22))
+
+ggplot(lmr, aes(tc, sc))+
+  geom_point(colour = 'dimgrey',
+             size   = 2)+
+  facet_wrap(~rtype)+
+  geom_smooth(colour = "black",
+              method  = "lm",
+              se      = FALSE)+
+  labs(list(x = "Mean TUT Score",
+            y = "Mean Saccade Count\nper Unit Time"))+
+  theme(axis.title.x      = element_text(vjust = -0.2),
+        axis.title.y      = element_text(vjust = 1.2),
+        legend.text       = element_text(face   = "bold",
+                                         family = "Times New Roman",
+                                         size   = 22),
+        panel.background  = element_rect(fill = "white"),
+        panel.grid.major  = element_line(colour = "white"),
+        panel.grid.minor  = element_line(colour = "white"),
+        text              = element_text(face   = "bold",
+                                         family = "Times New Roman",
+                                         size   = 22))
   
 # Linear Mixed-Effects Model
 lmem <- ed4 %>%
@@ -518,7 +564,7 @@ lmem %>%
 all <- lmer(tc ~ sc + fc + rc + (sc + fc + rc|sub), lmem)
 summary(all)
   
-lmemr <- ed4 %>%
+lmemr <- ed4r %>%
   ungroup() %>%
   filter(r < 25, scrt > 0) %>%
   select(sub, tnum, r, scrt, afdrt, tutra2, rtype) %>%
