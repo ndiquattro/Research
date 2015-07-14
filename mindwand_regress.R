@@ -49,27 +49,48 @@ cdat <- raw %>%
           )%>%
           filter(regs < 25, rt > 0)
 
+# Data Checking -----------------------------------------------------------
+
+submns <- cdat %>%
+            group_by(sub, tnum) %>%
+            slice(1) %>%
+            group_by(sub) %>%
+            summarise(
+              msc = mean(saccount)
+            )
+
+ggplot(submns, aes(msc))+
+  geom_histogram()
+
 # Within Subject Analysis -------------------------------------------------
 library(lme4)
+library(lmerTest)
 
 # Make data
 wdat <- cdat %>%
           group_by(sub, tnum) %>%
+          filter(sub != '31_lc') %>%
           slice(1) %>%  # Select first row of each trial
           mutate(
-            scrt = saccount / rt,
-            fcrt = fixc / rt
+            scrt = saccount / (rt / 1000),
+            fcrt = fixc / (rt / 1000)
           ) %>%
           group_by(sub) %>%
           mutate(
             fix_cen = (fcrt - mean(fcrt)) / sd(fcrt),
-            sac_cen = (scrt - mean(scrt)) / sd(scrt),
+            sac_cen = (scrt - mean(scrt)) / sd(fcrt),
             tutra_cen = (tutra - mean(tutra)) / sd(tutra)
           )
 
 # Run models
-mod1 <- lmer(tutra ~ sac_cen + regs + (fix_cen + regs|sub), wdat)
+mod1 <- lmer(tutra_cen ~ sac_cen + regs + (sac_cen + regs|sub), wdat)
 summary(mod1)
+
+# Plots
+ggplot(wdat, aes(tutra_cen, msamp))+
+  geom_point()+
+  geom_smooth(method = lm)+
+  facet_wrap(~sub)
 
 # Between Subjects Analysis -----------------------------------------------
 
@@ -81,31 +102,42 @@ bdat <- cdat %>%
             scrt = saccount / rt,
             fcrt = fixc / rt
           ) %>%
-          #group_by(sub) %>%  # Choose one of these, if looking at rtype or not
-          group_by(sub, rtype) %>%
+          group_by(sub) %>%  # Choose one of these, if looking at rtype or not
+          #group_by(sub, rtype) %>%
           summarise(
             mtut = mean(tutra),
-            mfix = mean(fcrt),
-            msac = mean(scrt),
+            mfix = mean(fcrt) * 1000,
+            msac = mean(scrt) * 1000,
             mreg = mean(regs),
+            mrt  = mean(rt) / 1000,
             hun  = mean(hunger),
             tire = mean(tired)
           ) %>%
           ungroup() %>%
           mutate(
-            msac_cen = (msac - mean(msac)) / sd(msac),
-            mfix_cen = (mfix - mean(mfix)) / sd(mfix)
+            msac_cen = (msac - mean(msac)),
+            mfix_cen = (mfix - mean(mfix)),
+            mrt_cen = (mrt - mean(mrt))
           )
 
-# Run Models
+# RT Model
+rtmod <- lm(mtut ~ mrt_cen * rtype, bdat)
+
+ggplot(bdat, aes(mtut, mrt, color = rtype))+
+  geom_point()+
+  geom_smooth(method = lm)+
+  facet_wrap(~rtype)
+
+# Eye metrics
 bmod <- lm(mtut ~ msac_cen + mreg + tire, bdat)
   summary(bmod)
 
-
-bmod2 <- lm(mtut ~ msac_cen*rtype , bdat)
-  summary(bmod2)
-
 # Plots
-ggplot(bdat, aes(msac_cen, mtut, color = rtype))+
+ggplot(bdat, aes(mreg, mtut, color = rtype))+
   geom_point()+
-  geom_smooth(aes(color = rtype), method = lm, se = FALSE)
+  geom_smooth(aes(color = rtype), method = lm, se = T)
+
+ggplot(bdat, aes(msac, mfix))+
+  geom_point()+
+  geom_smooth(method = lm)
+
